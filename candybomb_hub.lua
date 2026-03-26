@@ -1,112 +1,83 @@
--- Candy Bomb Hub Script
--- Escape Tsunami Brainrot Trading Plaza Helper
--- GUI + ESP + Auto Scanner
+-- Enemy Candy Bomb Detector (12-candy table version)
+-- Highlights ONLY bombs placed on your candies
 
-local player = game.Players.LocalPlayer
-local gui = Instance.new("ScreenGui", player.PlayerGui)
+local detected = {}
+local maxBombs = 3
 
-gui.Name = "CandyBombHub"
+local function highlightBomb(obj)
 
-local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0,200,0,120)
-frame.Position = UDim2.new(0,20,0,200)
-frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
-frame.Active = true
-frame.Draggable = true
+    if detected[obj] then return end
+    if #detected >= maxBombs then return end
 
-local title = Instance.new("TextLabel", frame)
-title.Size = UDim2.new(1,0,0,30)
-title.Text = "Candy Bomb Hub"
-title.BackgroundTransparency = 1
-title.TextColor3 = Color3.fromRGB(255,255,255)
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "EnemyBombESP"
+    highlight.FillColor = Color3.fromRGB(255, 0, 0)
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.FillTransparency = 0.15
+    highlight.Parent = obj
 
-local toggle = Instance.new("TextButton", frame)
-toggle.Size = UDim2.new(1,-20,0,40)
-toggle.Position = UDim2.new(0,10,0,40)
-toggle.Text = "Enable Bomb ESP"
-toggle.BackgroundColor3 = Color3.fromRGB(40,40,40)
-toggle.TextColor3 = Color3.new(1,1,1)
-
-local notify = Instance.new("TextLabel", frame)
-notify.Size = UDim2.new(1,0,0,30)
-notify.Position = UDim2.new(0,0,1,-30)
-notify.BackgroundTransparency = 1
-notify.TextColor3 = Color3.fromRGB(0,255,0)
-notify.Text = "Status: OFF"
-
-local enabled = false
-
-local keywords = {
-    "bomb",
-    "candybomb",
-    "explode",
-    "danger"
-}
-
-local function highlight(obj)
-
-    if obj:FindFirstChild("CandyBombESP") then return end
-
-    local h = Instance.new("Highlight")
-    h.Name = "CandyBombESP"
-    h.FillColor = Color3.fromRGB(255,0,0)
-    h.OutlineColor = Color3.fromRGB(255,255,255)
-    h.FillTransparency = 0.3
-    h.Parent = obj
+    detected[obj] = true
+    print("Enemy bomb detected:", obj:GetFullName())
 
 end
 
-local function scan()
 
-    for _,v in pairs(workspace:GetDescendants()) do
+local function checkCandy(obj)
 
-        local name = string.lower(v.Name)
+    -- most common server-side indicators
+    if obj:GetAttribute("BombOwner") == "Enemy" then
+        highlightBomb(obj)
+    end
 
-        for _,k in pairs(keywords) do
+    if obj:GetAttribute("IsBomb") == true then
+        highlightBomb(obj)
+    end
 
-            if string.find(name,k) then
-                highlight(v)
-                notify.Text = "Bomb candidate detected!"
-            end
-
-        end
-
+    if obj:FindFirstChild("BombMarker") then
+        highlightBomb(obj)
     end
 
 end
 
-toggle.MouseButton1Click:Connect(function()
 
-    enabled = not enabled
+-- scan candies already on table
+for _, v in pairs(workspace:GetDescendants()) do
 
-    if enabled then
-        notify.Text = "Status: ON"
-        toggle.Text = "Disable Bomb ESP"
+    if v:IsA("Part") or v:IsA("Model") then
+        checkCandy(v)
+    end
 
-        scan()
+end
 
-        workspace.DescendantAdded:Connect(function(v)
 
-            if enabled then
+-- detect bombs when enemy places them
+workspace.DescendantAdded:Connect(function(v)
 
-                local name = string.lower(v.Name)
+    task.wait(0.2)
 
-                for _,k in pairs(keywords) do
-
-                    if string.find(name,k) then
-                        highlight(v)
-                        notify.Text = "New bomb object detected!"
-                    end
-
-                end
-
-            end
-
-        end)
-
-    else
-        notify.Text = "Status: OFF"
-        toggle.Text = "Enable Bomb ESP"
+    if v:IsA("Part") or v:IsA("Model") then
+        checkCandy(v)
     end
 
 end)
+
+
+-- detect attribute changes live (MOST IMPORTANT)
+workspace.DescendantAdded:Connect(function(v)
+
+    v.AttributeChanged:Connect(function()
+
+        if v:GetAttribute("BombOwner") == "Enemy" then
+            highlightBomb(v)
+        end
+
+        if v:GetAttribute("IsBomb") == true then
+            highlightBomb(v)
+        end
+
+    end)
+
+end)
+
+
+print("Enemy bomb detector active (max 3 bombs).")
